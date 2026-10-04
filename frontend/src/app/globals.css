@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0F294A;
+  --color-primary-hover: #1E3A8A;
+  --color-primary-container: #0F294A;
+  --color-on-primary: #FFFFFF;
+
+  --color-secondary: #334155;
+  --color-secondary-container: #D5E3FD;
+  --color-on-secondary-container: #57657B;
+  --color-on-secondary-fixed: #0D1C2F;
+
+  --color-surface: #F8F9FF;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-surface-container-low: #EFF4FF;
+  --color-surface-container: #E5EEFF;
+  --color-surface-container-high: #DCE9FF;
+  --color-surface-container-highest: #D3E4FE;
+
+  --color-on-surface: #0B1C30;
+  --color-on-surface-variant: #475569;
+
+  --color-outline: #74777F;
+  --color-outline-variant: #E2E8F0;
+
+  --color-tertiary: #15803D;
+  --color-tertiary-fixed: #DCFCE7;
+  --color-on-tertiary-fixed: #15803D;
+  --color-on-tertiary-container: #15803D;
+  --color-tertiary-container: #003011;
+
+  --color-warning: #B45309;
+  --color-warning-container: #FEF3C7;
+  --color-warning-border: #FCD34D;
+
+  --color-error: #B91C1C;
+  --color-error-container: #FEE2E2;
+  --color-on-error-container: #93000A;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #F8F9FF;
+    color: #0B1C30;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Restrained Institutional Modernism: crisp flat containers with subtle 1px border */
+.card-flat {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.5rem;
+}
+
+.card-flat:hover {
+  border-color: #CBD5E1;
+}
+
+/* Material symbol fallback */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+}
