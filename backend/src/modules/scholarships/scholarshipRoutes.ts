@@ -133,6 +133,22 @@ router.get(
   }
 );
 
+// GET /api/scholarships/stats (Public platform aggregate metrics)
+router.get(
+  '/stats',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const stats = await dbService.getPlatformStats();
+      res.status(200).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // GET /api/scholarships/:id (Detailed view)
 router.get(
   '/:id',

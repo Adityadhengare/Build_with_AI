@@ -134,7 +134,7 @@ export default function LandingPage() {
                     </div>
                   ) : scholarships.length === 0 ? (
                     <div className="p-6 bg-white rounded-lg text-center text-xs text-[#64748B]">
-                      Loading verified schemes from database...
+                      No scholarships available in catalog yet.
                     </div>
                   ) : (
                     scholarships.slice(0, 3).map((sch) => (

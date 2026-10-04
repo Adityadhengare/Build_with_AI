@@ -103,8 +103,19 @@ router.post(
     try {
       const { email } = req.body;
 
-      // In real Firebase client flow, client signs in with Firebase Client SDK and sends ID Token
-      // Here we provide a mock/token generation response for dev & API testing
+      // In production/development, clients must authenticate via Firebase Client SDK.
+      // This endpoint is strictly restricted to automated unit test environments.
+      if (process.env.NODE_ENV !== 'test') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'CLIENT_AUTH_REQUIRED',
+            message: 'Direct API login is disabled. Please authenticate via Firebase Client SDK.',
+          },
+        });
+        return;
+      }
+
       let uid = 'test-student-uid-1';
       let role = 'STUDENT';
 
