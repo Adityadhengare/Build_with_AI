@@ -20,6 +20,19 @@ import { profileApi } from '@/lib/api/profile';
 import { StudentProfile } from '@/types/profile';
 import { formatINR } from '@/lib/utils';
 
+const DEFAULT_EDUCATION = {
+  currentLevel: 'UNDERGRADUATE' as const,
+  institutionName: '',
+  institutionState: 'Maharashtra',
+  boardOrUniversity: '',
+  courseName: '',
+  specialization: '',
+  currentYearOrSemester: 1,
+  passingYear: 2027,
+  percentageOrCgpa: 0,
+  gradingScale: 'PERCENTAGE' as const,
+};
+
 function ProfileContent() {
   const { user, refreshProfile } = useAuth();
   const [profile, setProfile] = useState<StudentProfile | null>(null);
@@ -35,7 +48,8 @@ function ProfileContent() {
       try {
         const data = await profileApi.getProfile();
         if (data) {
-          setProfile(data);
+          // Merge default education to guard against profiles created before education fields existed
+          setProfile({ ...data, education: { ...DEFAULT_EDUCATION, ...data.education } });
         } else {
           // Initialize empty profile for fresh authenticated user
           setProfile({
@@ -278,7 +292,7 @@ function ProfileContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="College / Institute Name"
-              value={profile.education.institutionName}
+              value={profile.education?.institutionName ?? ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
@@ -289,7 +303,7 @@ function ProfileContent() {
             />
             <Input
               label="Affiliated Board / University"
-              value={profile.education.boardOrUniversity}
+              value={profile.education?.boardOrUniversity ?? ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
@@ -303,7 +317,7 @@ function ProfileContent() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
               label="Degree / Course"
-              value={profile.education.courseName}
+              value={profile.education?.courseName ?? ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
@@ -314,7 +328,7 @@ function ProfileContent() {
             />
             <Input
               label="Specialization / Branch"
-              value={profile.education.specialization}
+              value={profile.education?.specialization ?? ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,

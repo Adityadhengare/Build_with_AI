@@ -116,11 +116,6 @@ export function ScholarshipCard({
               Needs Verification
             </Badge>
           )}
-          {scholarship.matchStatus === 'NOT_ELIGIBLE' && (
-            <Badge variant="error" size="sm">
-              Not Eligible
-            </Badge>
-          )}
         </div>
       </div>
 

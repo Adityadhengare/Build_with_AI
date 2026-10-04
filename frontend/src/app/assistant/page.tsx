@@ -14,6 +14,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { assistantApi, AssistantMessage } from '@/lib/api/assistant';
+import { FormattedMessage } from '@/components/ui/formatted-message';
 
 function AssistantContent() {
   const searchParams = useSearchParams();
@@ -60,13 +61,15 @@ function AssistantContent() {
     try {
       const response = await assistantApi.sendMessage(query);
       setMessages((prev) => [...prev, response]);
-    } catch {
+    } catch (err: any) {
+      console.error('AI Assistant chat error:', err);
+      const errorMessage = err?.message || 'I encountered a temporary connection issue. Please try asking again.';
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           sender: 'assistant',
-          content: 'I encountered a temporary connection issue. Please try asking again.',
+          content: errorMessage,
           timestamp: 'Just now',
         },
       ]);
@@ -166,9 +169,7 @@ function AssistantContent() {
                 }`}
               >
                 {/* Message Body with Markdown formatting support */}
-                <div className="whitespace-pre-line space-y-2">
-                  {msg.content}
-                </div>
+                <FormattedMessage content={msg.content} isUser={msg.sender === 'user'} />
 
                 {/* Tool Calling Chips (if assistant) */}
                 {msg.toolsUsed && msg.toolsUsed.length > 0 && (

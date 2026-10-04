@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { authenticateToken } from '../../middleware/auth';
+import { authenticateToken, optionalAuthenticate } from '../../middleware/auth';
 import { aiAssistantLimiter } from '../../middleware/rateLimit';
 import { validateRequest } from '../../middleware/validation';
 import { aiAssistantService } from '../../services/aiAssistantService';
@@ -21,12 +21,12 @@ const ChatMessageSchema = z.object({
 // POST /api/ai/chat
 router.post(
   '/chat',
-  authenticateToken,
+  optionalAuthenticate,
   aiAssistantLimiter,
   validateRequest({ body: ChatMessageSchema }),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user!.uid;
+      const userId = req.user?.uid || 'guest_student';
       const b = req.body;
       const queryMessage = b.message || b.query;
       const contextId = b.contextScholarshipId || b.scholarshipId;

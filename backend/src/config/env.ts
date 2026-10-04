@@ -18,8 +18,8 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === 'true' || process.env.NODE_ENV === 'test'),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL_FLASH: z.string().default('gemini-1.5-flash'),
-  GEMINI_MODEL_PRO: z.string().default('gemini-1.5-pro'),
+  GEMINI_MODEL_FLASH: z.string().default('gemini-2.5-flash'),
+  GEMINI_MODEL_PRO: z.string().default('gemini-2.5-flash'),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform((v) => parseInt(v, 10)),
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100').transform((v) => parseInt(v, 10)),
 });

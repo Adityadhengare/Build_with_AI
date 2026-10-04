@@ -1,14 +1,16 @@
 import rateLimit from 'express-rate-limit';
 import { env } from '../config/env';
 
-const isTest = env.NODE_ENV === 'test';
+// Skip rate limiting entirely in non-production environments.
+// Rate limiting is only meaningful in production to protect against abuse.
+const skipInDev = () => env.NODE_ENV !== 'production';
 
 export const generalLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   max: env.RATE_LIMIT_MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isTest,
+  skip: skipInDev,
   message: {
     success: false,
     error: {
@@ -23,7 +25,7 @@ export const authLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isTest,
+  skip: skipInDev,
   message: {
     success: false,
     error: {
@@ -38,7 +40,7 @@ export const uploadLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isTest,
+  skip: skipInDev,
   message: {
     success: false,
     error: {
@@ -53,7 +55,7 @@ export const aiAssistantLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isTest,
+  skip: skipInDev,
   message: {
     success: false,
     error: {

@@ -58,16 +58,35 @@ export async function authenticateToken(
         role = userDoc.role;
       }
 
-      req.user = {
-        uid,
-        email,
-        role,
-        isVerified: true,
-      };
+      req.user = { uid, email, role, isVerified: true };
       return next();
     }
 
-    // 2. Production Firebase Admin Token Verification
+    // 2. Local development mock mode — decode JWT payload without Admin SDK verification
+    //    USE_FIREBASE_EMULATOR_OR_MOCK=true in .env enables this path.
+    //    The Firebase client (frontend) still issues a real JWT; we just skip Admin verification.
+    if (isUsingMockFirebase()) {
+      try {
+        // JWT is base64url encoded: header.payload.signature
+        const payloadBase64 = token.split('.')[1];
+        const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf-8');
+        const payload = JSON.parse(payloadJson);
+        const uid = payload.sub || payload.user_id || 'unknown-uid';
+        const email = payload.email || '';
+        req.user = {
+          uid,
+          email,
+          role: 'STUDENT',
+          isVerified: payload.email_verified ?? false,
+        };
+        logger.warn(`[DEV MOCK] Auth bypassed for uid=${uid}. DO NOT use USE_FIREBASE_EMULATOR_OR_MOCK=true in production.`);
+        return next();
+      } catch {
+        return next(new UnauthorizedError('Could not decode token in mock mode. Ensure user is signed into Firebase.'));
+      }
+    }
+
+    // 3. Production Firebase Admin Token Verification
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
     
     // Check custom claims or fetch user record from Firestore for assigned role
@@ -131,6 +150,25 @@ export async function optionalAuthenticate(
 
       req.user = { uid, email, role, isVerified: true };
       return next();
+    }
+
+    if (isUsingMockFirebase()) {
+      try {
+        const payloadBase64 = token.split('.')[1];
+        const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf-8');
+        const payload = JSON.parse(payloadJson);
+        const uid = payload.sub || payload.user_id || 'unknown-uid';
+        const email = payload.email || '';
+        req.user = {
+          uid,
+          email,
+          role: 'STUDENT',
+          isVerified: payload.email_verified ?? false,
+        };
+        return next();
+      } catch {
+        return next();
+      }
     }
 
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);

@@ -212,7 +212,8 @@ export class EligibilityService {
       }
     }
 
-    // 9. Mandatory Documents Check
+    // 9. Document Readiness Check (informational only — does NOT affect eligibility status)
+    //    Documents are a pre-application checklist. Eligibility is determined by profile rules above.
     const verifiedDocTypes = studentDocuments
       .filter((d) => d.status === 'VERIFIED')
       .map((d) => d.documentType);
@@ -225,34 +226,43 @@ export class EligibilityService {
     }
 
     // Determine Final Match Status & Score
+    // Eligibility is based ONLY on profile rules: income, domicile state, category,
+    // academic score, gender, disability, minority. Documents are application-readiness only.
     let status: MatchStatus;
     let matchScore = 0;
 
+    const profileChecksPassed = checks.filter((c) => c.passed).length;
+    const totalProfileChecks = checks.length;
+
     if (mismatchReasons.length > 0) {
+      // Hard mismatch on a profile rule — genuinely not eligible
       status = 'NOT_ELIGIBLE';
-      const passedCount = checks.filter((c) => c.passed).length;
-      matchScore = Math.round((passedCount / checks.length) * 45);
-    } else if (missingDocuments.length > 0) {
-      status = 'NEEDS_VERIFICATION';
-      matchScore = Math.min(84, 65 + (student.profileCompleteness || 0) * 0.15);
-    } else if ((student.profileCompleteness || 0) < 70) {
+      matchScore = Math.round((profileChecksPassed / Math.max(totalProfileChecks, 1)) * 45);
+    } else if ((student.profileCompleteness || 0) < 50) {
+      // Profile is too sparse to confirm eligibility confidently
       status = 'LIKELY_ELIGIBLE';
-      matchScore = Math.min(89, 75 + (student.profileCompleteness || 0) * 0.12);
+      matchScore = Math.min(74, 55 + (student.profileCompleteness || 0) * 0.35);
     } else {
+      // All profile-based rules pass — student IS eligible regardless of document uploads
       status = 'ELIGIBLE';
-      matchScore = Math.min(99, 90 + Math.floor(Math.random() * 8));
+      // Score is driven by profile completeness (documents are bonus, not required)
+      const docReadinessBonus = mandatoryDocs.length > 0
+        ? Math.round(((mandatoryDocs.length - missingDocuments.length) / mandatoryDocs.length) * 6)
+        : 6;
+      matchScore = Math.min(99, 88 + docReadinessBonus);
     }
 
     // Build synthesized plain-English explanation
     let explanation = '';
     if (status === 'NOT_ELIGIBLE') {
       explanation = `You are currently not eligible for this scholarship because: ${mismatchReasons.join(' ')}`;
-    } else if (status === 'NEEDS_VERIFICATION') {
-      explanation = `You meet all primary criteria! However, you need to upload and verify: ${missingDocuments.join(', ')} to complete verification.`;
     } else if (status === 'LIKELY_ELIGIBLE') {
-      explanation = `You qualify for all hard requirements. Complete remaining profile details to elevate to fully verified status.`;
+      explanation = `You likely qualify — please complete your profile (income, state, category, academic marks) for a confirmed eligibility result.`;
     } else {
-      explanation = `You are 100% eligible! You satisfy domicile, category, income ceiling, and academic cutoffs, and your required documents are verified in your vault.`;
+      const docNote = missingDocuments.length > 0
+        ? ` To apply, ensure you have ready: ${missingDocuments.join(', ')}.`
+        : ' All required documents are already verified in your vault.';
+      explanation = `You are eligible! Your income ceiling, domicile state (${student.domicileState}), category (${student.category}), and academic score all satisfy the scholarship criteria.${docNote}`;
     }
 
     return {

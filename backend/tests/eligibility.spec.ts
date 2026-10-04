@@ -186,15 +186,15 @@ describe('Deterministic Eligibility Engine', () => {
     expect(failedChecks.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('7. Needs Verification: should return NEEDS_VERIFICATION if mandatory documents are missing', () => {
-    // Passes all hard checks, but no caste certificate in vault
+  it('7. Document Readiness: should return ELIGIBLE based on income, state, and category while tracking missing documents', () => {
+    // Passes all profile checks (income, state, category), but no caste certificate in vault
     const missingDocs = [verifiedDocs[0]]; // Only income cert
     const result = eligibilityService.evaluate(baseStudent, baseScholarship, missingDocs);
 
-    expect(result.status).toBe('NEEDS_VERIFICATION');
+    expect(result.status).toBe('ELIGIBLE');
     expect(result.missingDocuments).toContain('Caste Certificate');
     expect(result.mismatchReasons).toHaveLength(0);
-    expect(result.explanation).toContain('upload and verify');
+    expect(result.explanation).toContain('Caste Certificate');
   });
 
   it('8. Gender Restriction: should enforce gender-specific scholarships', () => {

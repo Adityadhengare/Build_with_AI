@@ -173,7 +173,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-3 text-xs">
               <div className="flex justify-between p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
                 <span className="text-[#475569]">Backend Engine Status</span>
-                <span className="font-bold text-[#15803D]">Operational (Port 5000)</span>
+                <span className="font-bold text-[#15803D]">Operational (Port 5001)</span>
               </div>
               <div className="flex justify-between p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0]">
                 <span className="text-[#475569]">Firestore Region</span>
