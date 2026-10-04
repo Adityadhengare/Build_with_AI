@@ -18,3 +18,11 @@ Complete, implementation-ready engineering and product specifications have been 
 | **Security Specification** | Authentication, RBAC, file upload sandbox, Gemini isolation, DPDPA 2023 | [docs/SECURITY.md](file:///home/pranavms09/Hackathons/build-with-ai/docs/SECURITY.md) |
 | **System Design Document** | Component architecture, sequence diagrams, deterministic engine, resilience | [docs/DESIGN.md](file:///home/pranavms09/Hackathons/build-with-ai/docs/DESIGN.md) |
 | **Documentation Checklist** | 10-point architectural audit and requirement traceability matrix (RTM) | [docs/DOCUMENTATION-CHECKLIST.md](file:///home/pranavms09/Hackathons/build-with-ai/docs/DOCUMENTATION-CHECKLIST.md) |
+
+## Project Status
+
+ScholarSathi is an AI-powered scholarship discovery and eligibility platform designed to help students find relevant scholarship opportunities based on their academic, personal, and socio-economic profiles.
+
+### Development
+
+The project is currently under active development. The platform includes a frontend, backend services, and Firebase integration.
