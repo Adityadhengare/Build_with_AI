@@ -1,5 +1,5 @@
 import { Scholarship } from '@/types/scholarship';
-import { MOCK_SCHOLARSHIPS } from '@/lib/mock/scholarships';
+import { apiClient } from './client';
 
 export interface ScholarshipFilters {
   query?: string;
@@ -9,67 +9,39 @@ export interface ScholarshipFilters {
   providerType?: string;
   status?: string;
   sortBy?: 'match' | 'deadline' | 'amount';
+  minAmount?: number;
 }
 
 export const scholarshipApi = {
   async getScholarships(filters?: ScholarshipFilters): Promise<Scholarship[]> {
-    // Simulates TRD GET /api/scholarships
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    let list = [...MOCK_SCHOLARSHIPS];
+    const params = new URLSearchParams();
+    if (filters?.query) params.set('search', filters.query);
+    if (filters?.state && filters.state !== 'ALL') params.set('state', filters.state);
+    if (filters?.category && filters.category !== 'ALL') params.set('category', filters.category);
+    if (filters?.education && filters.education !== 'ALL') params.set('educationLevel', filters.education);
+    if (filters?.providerType && filters.providerType !== 'ALL') params.set('providerType', filters.providerType);
+    if (filters?.status && filters.status !== 'ALL') params.set('status', filters.status);
+    if (filters?.sortBy) params.set('sortBy', filters.sortBy);
 
-    if (filters?.query) {
-      const q = filters.query.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.provider.name.toLowerCase().includes(q) ||
-          s.description.toLowerCase().includes(q) ||
-          s.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-
-    if (filters?.state && filters.state !== 'ALL') {
-      list = list.filter(
-        (s) => s.provider.state === filters.state || s.tags.includes('All India') || !s.provider.state
-      );
-    }
-
-    if (filters?.category && filters.category !== 'ALL') {
-      list = list.filter((s) => s.eligibilitySummary.includes(filters.category!) || s.tags.includes(filters.category!));
-    }
-
-    if (filters?.providerType && filters.providerType !== 'ALL') {
-      list = list.filter((s) => s.provider.type === filters.providerType);
-    }
-
-    if (filters?.sortBy === 'deadline') {
-      list.sort((a, b) => new Date(a.applicationDeadline).getTime() - new Date(b.applicationDeadline).getTime());
-    } else if (filters?.sortBy === 'amount') {
-      list.sort((a, b) => b.estimatedAmountINR - a.estimatedAmountINR);
-    } else {
-      // Default: best match score
-      list.sort((a, b) => b.matchScore - a.matchScore);
-    }
-
-    return list;
+    const queryString = params.toString();
+    const endpoint = queryString ? `/scholarships?${queryString}` : '/scholarships';
+    return await apiClient<Scholarship[]>(endpoint);
   },
 
-  async getScholarshipById(id: string): Promise<Scholarship | null> {
-    // Simulates TRD GET /api/scholarships/:id
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const found = MOCK_SCHOLARSHIPS.find((s) => s.id === id || s.slug === id);
-    return found || null;
+  async getScholarshipById(id: string): Promise<Scholarship> {
+    return await apiClient<Scholarship>(`/scholarships/${id}`);
   },
 
   async getSavedScholarships(): Promise<Scholarship[]> {
-    // Simulates TRD GET /api/scholarships/saved
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    return MOCK_SCHOLARSHIPS.slice(0, 3);
+    return await apiClient<Scholarship[]>('/scholarships/saved');
   },
 
   async toggleSaveScholarship(id: string, save: boolean): Promise<boolean> {
-    // Simulates TRD POST/DELETE /api/scholarships/:id/save
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (save) {
+      await apiClient(`/scholarships/${id}/save`, { method: 'POST' });
+    } else {
+      await apiClient(`/scholarships/${id}/save`, { method: 'DELETE' });
+    }
     return save;
-  }
+  },
 };

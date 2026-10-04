@@ -1,46 +1,46 @@
 import { StudentDocument, DocumentType } from '@/types/document';
-import { MOCK_DOCUMENTS } from '@/lib/mock/documents';
+import { apiClient } from './client';
 
 export const documentsApi = {
   async getDocuments(): Promise<StudentDocument[]> {
-    // Simulates TRD GET /api/documents
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    return [...MOCK_DOCUMENTS];
+    return await apiClient<StudentDocument[]>('/documents');
   },
 
   async uploadDocument(file: File, documentType: DocumentType): Promise<StudentDocument> {
-    // Simulates TRD POST /api/documents/upload & server-side Gemini extraction
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const newDoc: StudentDocument = {
-      id: `doc-${Date.now()}`,
-      documentType,
-      title: file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " "),
-      fileName: file.name,
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('documentType', documentType);
+
+    const result = await apiClient<any>('/documents/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    return {
+      id: result.documentId || result.id || `doc-${Date.now()}`,
+      documentType: result.documentType || documentType,
+      title: result.title || file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' '),
+      fileName: result.fileName || file.name,
       fileSizeBytes: file.size,
       uploadedAt: new Date().toISOString(),
-      status: 'VERIFIED',
-      authorityBadge: 'AI Extracted & Form Validation Verified',
-      extraction: {
-        annualIncome: documentType === 'INCOME_CERTIFICATE' ? 235000 : undefined,
-        financialYear: documentType === 'INCOME_CERTIFICATE' ? '2026-27' : undefined,
-        confidenceScore: 0.95,
-      }
+      status: result.status || 'VERIFIED',
+      authorityBadge: result.authorityBadge || 'AI Extracted & Form Validation Verified',
+      extraction: result.extraction,
     };
-    return newDoc;
   },
 
-  async verifyDocument(_id: string, _correctedValues?: Record<string, unknown>): Promise<boolean> {
-    void _id;
-    void _correctedValues;
-    // Simulates TRD POST /api/documents/:id/verify
-    await new Promise((resolve) => setTimeout(resolve, 150));
+  async verifyDocument(id: string, correctedValues?: Record<string, unknown>): Promise<boolean> {
+    await apiClient(`/documents/${id}/verify`, {
+      method: 'POST',
+      body: JSON.stringify(correctedValues || {}),
+    });
     return true;
   },
 
-  async deleteDocument(_id: string): Promise<boolean> {
-    void _id;
-    // Simulates TRD DELETE /api/documents/:id
-    await new Promise((resolve) => setTimeout(resolve, 150));
+  async deleteDocument(id: string): Promise<boolean> {
+    await apiClient(`/documents/${id}`, {
+      method: 'DELETE',
+    });
     return true;
-  }
+  },
 };

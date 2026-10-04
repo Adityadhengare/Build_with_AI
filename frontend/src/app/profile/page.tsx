@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { ProtectedRoute } from '@/components/auth/protected-route';
+import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -10,42 +12,117 @@ import {
   Award, 
   RefreshCw, 
   CheckCircle2, 
-  Save
+  Save,
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { profileApi } from '@/lib/api/profile';
 import { StudentProfile } from '@/types/profile';
 import { formatINR } from '@/lib/utils';
 
-export default function ProfilePage() {
+function ProfileContent() {
+  const { user, refreshProfile } = useAuth();
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     async function loadProfile() {
       setIsLoading(true);
-      const data = await profileApi.getProfile();
-      setProfile(data);
-      setIsLoading(false);
+      try {
+        const data = await profileApi.getProfile();
+        if (data) {
+          setProfile(data);
+        } else {
+          // Initialize empty profile for fresh authenticated user
+          setProfile({
+            id: user?.uid || '',
+            fullName: user?.displayName || '',
+            email: user?.email || '',
+            phone: '',
+            dob: '',
+            gender: 'MALE',
+            domicileState: 'Maharashtra',
+            domicileDistrict: '',
+            category: 'GENERAL',
+            religion: 'OTHER',
+            familyAnnualIncome: 0,
+            parentOccupation: '',
+            isDisabled: false,
+            minorityStatus: false,
+            profileCompleteness: 0,
+            education: {
+              currentLevel: 'UNDERGRADUATE',
+              institutionName: '',
+              institutionState: 'Maharashtra',
+              boardOrUniversity: '',
+              courseName: '',
+              specialization: '',
+              currentYearOrSemester: 1,
+              passingYear: 2027,
+              percentageOrCgpa: 0,
+              gradingScale: 'PERCENTAGE',
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      } finally {
+        setIsLoading(false);
+      }
     }
     loadProfile();
-  }, []);
+  }, [user]);
+
+  // Dynamic Profile Completion Calculation (Requirement 19)
+  const calculateCompletion = (p: StudentProfile | null): number => {
+    if (!p) return 0;
+    const requiredFields = [
+      Boolean(p.fullName?.trim()),
+      Boolean(p.email?.trim()),
+      Boolean(p.phone?.trim()),
+      Boolean(p.dob?.trim()),
+      Boolean(p.domicileState?.trim()),
+      Boolean(p.domicileDistrict?.trim()),
+      Boolean(p.category),
+      Boolean(p.familyAnnualIncome !== undefined && p.familyAnnualIncome !== null),
+      Boolean(p.education?.institutionName?.trim()),
+      Boolean(p.education?.courseName?.trim()),
+      Boolean(p.education?.percentageOrCgpa && p.education.percentageOrCgpa > 0),
+    ];
+    const completedCount = requiredFields.filter(Boolean).length;
+    return Math.round((completedCount / requiredFields.length) * 100);
+  };
+
+  const completionPercentage = calculateCompletion(profile);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
     setIsSaving(true);
-    await profileApi.updateProfile(profile);
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setErrorMsg('');
+    try {
+      const updated = await profileApi.updateProfile({
+        ...profile,
+        profileCompleteness: completionPercentage,
+      });
+      setProfile(updated);
+      await refreshProfile();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to save profile.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleRecalculate = async () => {
     setIsRecalculating(true);
-    await profileApi.recalculateMatches();
+    await profileApi.recalculateMatches().catch(() => null);
     setIsRecalculating(false);
   };
 
@@ -57,23 +134,39 @@ export default function ProfilePage() {
     );
   }
 
+  const displayName = profile.fullName || user?.displayName || user?.email?.split('@')[0] || 'Student Profile';
+  const userInitials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('') || 'U';
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 md:py-8 flex flex-col gap-6">
       {/* Profile Header Card */}
       <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-[#E5EEFF] border border-[#CBD5E1] text-[#0F294A] flex items-center justify-center font-bold text-xl shrink-0">
-            AP
+            {userInitials}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-bold text-[#0F294A]">{profile.fullName}</h1>
-              <span className="text-xs font-bold text-[#15803D] bg-[#DCFCE7] px-2 py-0.5 rounded border border-[#86EFAC] flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> DigiLocker Verified
-              </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl md:text-2xl font-bold text-[#0F294A]">{displayName}</h1>
+              {completionPercentage >= 80 ? (
+                <span className="text-xs font-bold text-[#15803D] bg-[#DCFCE7] px-2 py-0.5 rounded border border-[#86EFAC] flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Profile Complete
+                </span>
+              ) : (
+                <span className="text-xs font-bold text-[#B45309] bg-[#FEF3C7] px-2 py-0.5 rounded border border-[#FCD34D] flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" /> {completionPercentage}% Complete
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#64748B] mt-0.5">
-              {profile.education.courseName} ({profile.education.specialization}) • {profile.education.institutionName}
+              {profile.education?.courseName
+                ? `${profile.education.courseName} • ${profile.education.institutionName || 'Student'}`
+                : 'Student profile registered'}
             </p>
           </div>
         </div>
@@ -95,7 +188,14 @@ export default function ProfilePage() {
       {saveSuccess && (
         <div className="p-3 bg-[#DCFCE7] border border-[#86EFAC] text-xs font-bold text-[#15803D] rounded-lg flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
-          <span>Profile information saved successfully. Matches updated.</span>
+          <span>Profile information saved successfully. Eligibility matches updated.</span>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-3 bg-[#FEE2E2] border border-[#FCA5A5] text-xs font-bold text-[#B91C1C] rounded-lg flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          <span>{errorMsg}</span>
         </div>
       )}
 
@@ -119,14 +219,13 @@ export default function ProfilePage() {
               label="Email Address"
               type="email"
               value={profile.email}
-              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-              required
+              disabled
+              helperText="Managed via Firebase Authentication"
             />
             <Input
               label="Mobile Phone"
-              value={profile.phone}
+              value={profile.phone || ''}
               onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              required
             />
           </div>
 
@@ -134,17 +233,18 @@ export default function ProfilePage() {
             <Input
               label="Date of Birth"
               type="date"
-              value={profile.dob}
+              value={profile.dob || ''}
               onChange={(e) => setProfile({ ...profile, dob: e.target.value })}
             />
             <Select
               label="Gender"
               value={profile.gender}
-              onChange={(e) => setProfile({ ...profile, gender: e.target.value as 'MALE' | 'FEMALE' | 'TRANSGENDER' | 'OTHER' })}
+              onChange={(e) => setProfile({ ...profile, gender: e.target.value as any })}
               options={[
                 { value: 'MALE', label: 'Male' },
                 { value: 'FEMALE', label: 'Female' },
                 { value: 'TRANSGENDER', label: 'Transgender' },
+                { value: 'OTHER', label: 'Other' },
               ]}
             />
             <Select
@@ -157,6 +257,12 @@ export default function ProfilePage() {
                 { value: 'Uttar Pradesh', label: 'Uttar Pradesh' },
                 { value: 'Odisha', label: 'Odisha' },
                 { value: 'Delhi', label: 'Delhi (NCT)' },
+                { value: 'Bihar', label: 'Bihar' },
+                { value: 'Tamil Nadu', label: 'Tamil Nadu' },
+                { value: 'Gujarat', label: 'Gujarat' },
+                { value: 'Madhya Pradesh', label: 'Madhya Pradesh' },
+                { value: 'Rajasthan', label: 'Rajasthan' },
+                { value: 'West Bengal', label: 'West Bengal' },
               ]}
             />
           </div>
@@ -221,7 +327,7 @@ export default function ProfilePage() {
               label="Aggregate Marks / Percentage (%)"
               type="number"
               step="0.1"
-              value={profile.education.percentageOrCgpa}
+              value={profile.education.percentageOrCgpa || ''}
               onChange={(e) =>
                 setProfile({
                   ...profile,
@@ -244,23 +350,23 @@ export default function ProfilePage() {
             <Select
               label="Social Category"
               value={profile.category}
-              onChange={(e) => setProfile({ ...profile, category: e.target.value as 'GENERAL' | 'OBC' | 'SC' | 'ST' | 'EWS' })}
+              onChange={(e) => setProfile({ ...profile, category: e.target.value as any })}
               options={[
+                { value: 'GENERAL', label: 'General / Open' },
                 { value: 'OBC', label: 'OBC (Other Backward Class)' },
                 { value: 'SC', label: 'SC (Scheduled Caste)' },
                 { value: 'ST', label: 'ST (Scheduled Tribe)' },
                 { value: 'EWS', label: 'EWS (Economically Weaker Section)' },
-                { value: 'GENERAL', label: 'General / Open' },
               ]}
             />
             <Input
               label="Family Annual Income (₹ INR)"
               type="number"
-              value={profile.familyAnnualIncome}
+              value={profile.familyAnnualIncome || ''}
               onChange={(e) =>
                 setProfile({ ...profile, familyAnnualIncome: parseFloat(e.target.value) || 0 })
               }
-              helperText={`Currently evaluated as ${formatINR(profile.familyAnnualIncome)} per year`}
+              helperText={`Evaluated as ${formatINR(profile.familyAnnualIncome || 0)} per year`}
               required
             />
           </div>
@@ -296,5 +402,13 @@ export default function ProfilePage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <ProtectedRoute>
+      <ProfileContent />
+    </ProtectedRoute>
   );
 }

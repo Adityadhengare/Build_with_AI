@@ -1,22 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/layout/logo';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
-  const [email, setEmail] = useState('aditya.patil@engg.edu.in');
-  const [password, setPassword] = useState('SecurePass123!');
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const { login, loginWithGoogle } = useAuth();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -26,19 +31,33 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    // Simulate login API call
-    setTimeout(() => {
+    try {
+      await login(email, password);
+      router.push(redirectUrl);
+    } catch (err: any) {
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Invalid email or password. Please check your credentials.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many unsuccessful attempts. Please reset your password or try again later.');
+      } else {
+        setError(err.message || 'Authentication failed. Please try again.');
+      }
+    } finally {
       setIsLoading(false);
-      router.push('/dashboard');
-    }, 600);
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    setError('');
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      await loginWithGoogle();
+      router.push(redirectUrl);
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed. Please try again.');
+    } finally {
       setIsLoading(false);
-      router.push('/dashboard');
-    }, 500);
+    }
   };
 
   return (
@@ -68,57 +87,66 @@ export default function LoginPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="student@institution.ac.in"
+            placeholder="student@example.edu.in"
             required
+            autoComplete="email"
           />
 
-          <div className="relative">
-            <Input
-              label="Password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-8 text-[#94A3B8] hover:text-[#475569]"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-[#334155] uppercase tracking-wider">
+                Password
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-[#1D4ED8] hover:underline"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                autoComplete="current-password"
+                className="h-10 w-full rounded border border-[#CBD5E1] bg-white px-3 pr-10 text-sm text-[#0F294A] focus:outline-none focus:border-[#0F294A]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-[#64748B] hover:text-[#0F294A]"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs">
-            <label className="flex items-center gap-2 text-[#475569] cursor-pointer">
-              <input type="checkbox" defaultChecked className="rounded border-[#CBD5E1] text-[#0F294A]" />
-              <span>Remember me</span>
-            </label>
-            <a href="#" className="font-semibold text-[#1D4ED8] hover:underline">
-              Forgot password?
-            </a>
-          </div>
-
-          <Button type="submit" variant="primary" size="lg" className="w-full mt-2" isLoading={isLoading}>
-            Sign In to Dashboard
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            isLoading={isLoading}
+            className="w-full mt-2"
+          >
+            Sign In
           </Button>
         </form>
 
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1 bg-[#E2E8F0]"></div>
-          <span className="text-[11px] font-semibold text-[#94A3B8] uppercase">Or continue with</span>
+          <span className="text-[11px] font-semibold text-[#94A3B8] uppercase">or continue with</span>
           <div className="h-px flex-1 bg-[#E2E8F0]"></div>
         </div>
 
-        {/* Google SSO */}
-        <Button
+        <button
           type="button"
           onClick={handleGoogleLogin}
-          variant="outline"
-          size="md"
-          className="w-full flex items-center justify-center gap-2"
+          disabled={isLoading}
+          className="w-full flex items-center justify-center gap-3 h-10 px-4 rounded border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-60"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path
@@ -138,16 +166,24 @@ export default function LoginPage() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
             />
           </svg>
-          <span className="text-xs font-semibold text-[#0F294A]">Sign In with Google</span>
-        </Button>
+          Sign in with Google Workspace / Gmail
+        </button>
 
-        <div className="mt-6 pt-4 border-t border-[#E2E8F0] text-center text-xs text-[#64748B]">
+        <div className="mt-6 text-center text-xs text-[#64748B]">
           New to ScholarSathi?{' '}
           <Link href="/register" className="font-bold text-[#0F294A] hover:underline">
-            Create a student account
+            Register your profile
           </Link>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { ProtectedRoute } from '@/components/auth/protected-route';
+import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { 
   Sparkles, 
@@ -16,12 +18,15 @@ import { assistantApi, AssistantMessage } from '@/lib/api/assistant';
 function AssistantContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
+  const { user, profile } = useAuth();
+
+  const studentName = profile?.fullName || user?.displayName || 'there';
 
   const [messages, setMessages] = useState<AssistantMessage[]>([
     {
       id: 'welcome-msg',
       sender: 'assistant',
-      content: `Hello Aditya! I am your **ScholarSathi AI Assistant**.\n\nI am grounded strictly in official government regulations (NSP, MahaDBT, SSP Karnataka) and your verified student profile (B.Tech 3rd Year, OBC, Maharashtra domicile, ₹2.35L income).\n\nHow can I help you today? You can ask about eligibility rules, missing certificates, or upcoming deadlines.`,
+      content: `Hello ${studentName}! I am your **ScholarSathi AI Assistant**.\n\nI am grounded strictly in official government regulations (NSP, MahaDBT, SSP Karnataka) and your student profile.\n\nHow can I help you today? You can ask about eligibility rules, required certificates, or upcoming deadlines.`,
       timestamp: 'Just now',
       toolsUsed: ['getStudentProfile'],
     },
@@ -259,8 +264,10 @@ function AssistantContent() {
 
 export default function AssistantPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm text-[#64748B]">Loading assistant...</div>}>
-      <AssistantContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense fallback={<div className="p-8 text-center text-sm text-[#64748B]">Loading assistant...</div>}>
+        <AssistantContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }

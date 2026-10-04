@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { 
@@ -17,7 +18,7 @@ import { applicationsApi } from '@/lib/api/applications';
 import { ApplicationRecord, ApplicationStatus } from '@/types/application';
 import { formatDate } from '@/lib/utils';
 
-export default function ApplicationsPage() {
+function ApplicationsContent() {
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingApp, setEditingApp] = useState<ApplicationRecord | null>(null);
@@ -271,5 +272,13 @@ export default function ApplicationsPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function ApplicationsPage() {
+  return (
+    <ProtectedRoute>
+      <ApplicationsContent />
+    </ProtectedRoute>
   );
 }

@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ProtectedRoute } from '@/components/auth/protected-route';
+import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -15,65 +17,140 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { profileApi } from '@/lib/api/profile';
+import { documentsApi } from '@/lib/api/documents';
+import { DocumentType } from '@/types/document';
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const router = useRouter();
+  const { user, refreshProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  // Form states
+  // Form states - completely empty initial states, defaulting name/email from Firebase Auth
   const [personal, setPersonal] = useState({
-    fullName: 'Aditya Patil',
-    dob: '2004-06-18',
+    fullName: user?.displayName || '',
+    phone: '',
+    dob: '',
     gender: 'MALE',
     state: 'Maharashtra',
-    district: 'Pune',
+    district: '',
     isDomicile: 'YES',
   });
 
   const [education, setEducation] = useState({
     level: 'UNDERGRADUATE',
-    college: 'Government College of Engineering, Pune (COEP)',
-    course: 'B.Tech',
-    branch: 'Computer Science & Engineering',
-    year: '3',
-    marks: '78.4',
+    college: '',
+    boardOrUniversity: '',
+    course: '',
+    branch: '',
+    year: '1',
+    marks: '',
     gradingScale: 'PERCENTAGE',
   });
 
   const [eligibility, setEligibility] = useState({
-    category: 'OBC',
-    annualIncome: '235000',
-    parentOccupation: 'Farmer / Small Business',
+    category: 'GENERAL',
+    annualIncome: '',
+    parentOccupation: '',
     isDisabled: 'NO',
+    disabilityPercentage: '',
     minorityStatus: 'NO',
   });
 
-  const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: string }>({
-    incomeCert: 'Income_Certificate_2026.pdf',
-    casteCert: 'OBC_Certificate.pdf',
-    domicileCert: 'Domicile_Maharashtra.pdf',
-  });
+  const [selectedFiles, setSelectedFiles] = useState<{ [key in DocumentType]?: File }>({});
 
-  const handleFileUpload = (docType: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (user?.displayName && !personal.fullName) {
+      setPersonal((prev) => ({ ...prev, fullName: user.displayName || '' }));
+    }
+  }, [user]);
+
+  const handleFileChange = (docType: DocumentType, e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setUploadedFiles((prev) => ({
+      setSelectedFiles((prev) => ({
         ...prev,
-        [docType]: e.target.files![0].name,
+        [docType]: e.target.files![0],
       }));
     }
   };
 
-  const handleNext = () => {
-    if (currentStep < 4) {
-      setCurrentStep(currentStep + 1);
+  const handleNext = async () => {
+    setErrorMsg('');
+    if (currentStep === 1) {
+      if (!personal.fullName.trim() || !personal.district.trim()) {
+        setErrorMsg('Please enter your full name and district.');
+        return;
+      }
+      setCurrentStep(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (currentStep === 2) {
+      if (!education.college.trim() || !education.course.trim() || !education.marks.trim()) {
+        setErrorMsg('Please enter your college name, degree course, and aggregate marks.');
+        return;
+      }
+      setCurrentStep(3);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (currentStep === 3) {
+      if (!eligibility.annualIncome.trim()) {
+        setErrorMsg('Please enter your family annual income.');
+        return;
+      }
+      setCurrentStep(4);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
+      // Step 4: Final submission
       setIsLoading(true);
-      setTimeout(() => {
-        setIsLoading(false);
+      try {
+        // 1. Save Profile
+        await profileApi.updateProfile({
+          fullName: personal.fullName.trim(),
+          phone: personal.phone.trim(),
+          dob: personal.dob || undefined,
+          gender: personal.gender as any,
+          domicileState: personal.state,
+          domicileDistrict: personal.district.trim(),
+          category: eligibility.category as any,
+          religion: 'OTHER',
+          familyAnnualIncome: parseFloat(eligibility.annualIncome) || 0,
+          parentOccupation: eligibility.parentOccupation.trim() || 'General',
+          isDisabled: eligibility.isDisabled === 'YES',
+          disabilityPercentage: eligibility.disabilityPercentage ? parseFloat(eligibility.disabilityPercentage) : undefined,
+          minorityStatus: eligibility.minorityStatus === 'YES',
+          profileCompleteness: 100,
+          education: {
+            currentLevel: education.level as any,
+            institutionName: education.college.trim(),
+            institutionState: personal.state,
+            boardOrUniversity: education.boardOrUniversity.trim() || education.college.trim(),
+            courseName: education.course.trim(),
+            specialization: education.branch.trim() || 'General',
+            currentYearOrSemester: parseInt(education.year, 10) || 1,
+            passingYear: 2026 + (4 - (parseInt(education.year, 10) || 1)),
+            percentageOrCgpa: parseFloat(education.marks) || 0,
+            gradingScale: (education.gradingScale as any) || 'PERCENTAGE',
+          },
+        });
+
+        // 2. Upload any certificates selected in onboarding
+        const uploadPromises = Object.entries(selectedFiles).map(([docType, file]) => {
+          if (file) {
+            return documentsApi.uploadDocument(file, docType as DocumentType).catch(() => null);
+          }
+          return Promise.resolve(null);
+        });
+        await Promise.all(uploadPromises);
+
+        // 3. Refresh user profile in Auth context
+        await refreshProfile();
+
+        // 4. Redirect to Dashboard
         router.push('/dashboard');
-      }, 700);
+      } catch (err: any) {
+        setErrorMsg(err.message || 'Failed to complete profile. Please try again.');
+        setIsLoading(false);
+      }
     }
   };
 
@@ -99,7 +176,7 @@ export default function OnboardingPage() {
           Complete Your Student Profile
         </h1>
         <p className="text-xs md:text-sm text-[#475569] mt-1">
-          Accurate information ensures 100% deterministic matching with government and private scholarships.
+          Accurate information ensures deterministic matching with government and private scholarships.
         </p>
       </div>
 
@@ -137,6 +214,12 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      {errorMsg && (
+        <div className="mb-4 p-3 bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] rounded-lg text-xs font-semibold">
+          {errorMsg}
+        </div>
+      )}
+
       {/* Step Card Container */}
       <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 md:p-8 shadow-xs">
         {/* Step 1: Personal Information */}
@@ -149,33 +232,46 @@ export default function OnboardingPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Full Name (as per certificates)"
+                label="Full Legal Name"
+                placeholder="Enter your full name as per Aadhaar/10th marksheet"
                 value={personal.fullName}
                 onChange={(e) => setPersonal({ ...personal, fullName: e.target.value })}
                 required
               />
+
+              <Input
+                label="Mobile Phone"
+                type="tel"
+                placeholder="10-digit mobile number"
+                value={personal.phone}
+                onChange={(e) => setPersonal({ ...personal, phone: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Date of Birth"
                 type="date"
                 value={personal.dob}
                 onChange={(e) => setPersonal({ ...personal, dob: e.target.value })}
-                required
               />
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Select
                 label="Gender"
                 value={personal.gender}
                 onChange={(e) => setPersonal({ ...personal, gender: e.target.value })}
                 options={[
                   { value: 'MALE', label: 'Male' },
-                  { value: 'FEMALE', label: 'Female' },
+                  { value: 'FEMALE', label: 'Female (Eligible for Girl-Child Schemes)' },
                   { value: 'TRANSGENDER', label: 'Transgender' },
+                  { value: 'OTHER', label: 'Other' },
                 ]}
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
-                label="State of Domicile"
+                label="State of Domicile (Permanent Residence)"
                 value={personal.state}
                 onChange={(e) => setPersonal({ ...personal, state: e.target.value })}
                 options={[
@@ -183,77 +279,83 @@ export default function OnboardingPage() {
                   { value: 'Karnataka', label: 'Karnataka' },
                   { value: 'Uttar Pradesh', label: 'Uttar Pradesh' },
                   { value: 'Odisha', label: 'Odisha' },
+                  { value: 'Delhi', label: 'Delhi (NCT)' },
+                  { value: 'Bihar', label: 'Bihar' },
                   { value: 'Tamil Nadu', label: 'Tamil Nadu' },
                   { value: 'Gujarat', label: 'Gujarat' },
+                  { value: 'Madhya Pradesh', label: 'Madhya Pradesh' },
+                  { value: 'Rajasthan', label: 'Rajasthan' },
                   { value: 'West Bengal', label: 'West Bengal' },
                 ]}
               />
+
               <Input
                 label="District"
+                placeholder="e.g. Pune, Bangalore Urban, Lucknow"
                 value={personal.district}
                 onChange={(e) => setPersonal({ ...personal, district: e.target.value })}
                 required
               />
             </div>
-
-            <div>
-              <Select
-                label="Do you have a valid State Domicile Certificate?"
-                value={personal.isDomicile}
-                onChange={(e) => setPersonal({ ...personal, isDomicile: e.target.value })}
-                options={[
-                  { value: 'YES', label: 'Yes, issued by Executive Magistrate / Tehsildar' },
-                  { value: 'NO', label: 'No / In Application Process' },
-                ]}
-              />
-            </div>
           </div>
         )}
 
-        {/* Step 2: Education */}
+        {/* Step 2: Education Information */}
         {currentStep === 2 && (
           <div className="space-y-5 animate-in fade-in-0 duration-200">
             <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-              <h2 className="text-base font-bold text-[#0F294A]">Current Academic Profile</h2>
-              <p className="text-xs text-[#64748B]">Your educational level and academic marks determine cutoffs and fee waiver caps.</p>
+              <h2 className="text-base font-bold text-[#0F294A]">Academic &amp; Course Enrollment</h2>
+              <p className="text-xs text-[#64748B]">Used to evaluate degree eligibility and minimum aggregate marks cutoffs.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
-                label="Current Education Level"
+                label="Education Level"
                 value={education.level}
                 onChange={(e) => setEducation({ ...education, level: e.target.value })}
                 options={[
-                  { value: 'UNDERGRADUATE', label: 'Undergraduate Degree (B.Tech, B.Sc, MBBS)' },
-                  { value: 'POSTGRADUATE', label: 'Postgraduate Degree (M.Tech, M.Sc, MBA)' },
-                  { value: 'DIPLOMA', label: 'Polytechnic & Diploma' },
-                  { value: 'CLASS_12', label: 'Class 12th' },
-                  { value: 'CLASS_10', label: 'Class 10th' },
+                  { value: 'UNDERGRADUATE', label: 'Undergraduate (B.Tech, B.Sc, B.Com, MBBS)' },
+                  { value: 'POSTGRADUATE', label: 'Postgraduate (M.Tech, M.Sc, MBA)' },
+                  { value: 'DIPLOMA', label: 'Diploma / Polytechnic' },
+                  { value: 'CLASS_12', label: 'Class 12 (Higher Secondary)' },
+                  { value: 'CLASS_10', label: 'Class 10 (Secondary)' },
                 ]}
               />
+
               <Input
-                label="Institution / College Name"
+                label="College / Institute Full Name"
+                placeholder="e.g. COEP Technological University, Pune"
                 value={education.college}
                 onChange={(e) => setEducation({ ...education, college: e.target.value })}
                 required
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Course / Degree"
+                label="Affiliated Board / University"
+                placeholder="e.g. SPPU, AICTE, CBSE"
+                value={education.boardOrUniversity}
+                onChange={(e) => setEducation({ ...education, boardOrUniversity: e.target.value })}
+              />
+
+              <Input
+                label="Degree / Course Name"
+                placeholder="e.g. B.Tech, B.Sc Computer Science"
                 value={education.course}
                 onChange={(e) => setEducation({ ...education, course: e.target.value })}
-                placeholder="e.g. B.Tech"
                 required
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Input
                 label="Branch / Specialization"
+                placeholder="e.g. Computer Science, Mechanical"
                 value={education.branch}
                 onChange={(e) => setEducation({ ...education, branch: e.target.value })}
-                placeholder="e.g. Computer Science"
-                required
               />
+
               <Select
                 label="Current Year of Study"
                 value={education.year}
@@ -263,86 +365,81 @@ export default function OnboardingPage() {
                   { value: '2', label: '2nd Year' },
                   { value: '3', label: '3rd Year' },
                   { value: '4', label: '4th Year' },
+                  { value: '5', label: '5th Year' },
                 ]}
               />
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Previous Qualifying Percentage (%)"
+                label="Aggregate Score (%) / CGPA"
                 type="number"
                 step="0.1"
+                placeholder="e.g. 78.5"
                 value={education.marks}
                 onChange={(e) => setEducation({ ...education, marks: e.target.value })}
-                helperText="Aggregate percentage obtained in Class 12 or last semester"
                 required
-              />
-              <Select
-                label="Grading System"
-                value={education.gradingScale}
-                onChange={(e) => setEducation({ ...education, gradingScale: e.target.value })}
-                options={[
-                  { value: 'PERCENTAGE', label: 'Percentage (%)' },
-                  { value: 'CGPA_10', label: 'CGPA (Out of 10)' },
-                ]}
               />
             </div>
           </div>
         )}
 
-        {/* Step 3: Eligibility & Income */}
+        {/* Step 3: Eligibility & Category Parameters */}
         {currentStep === 3 && (
           <div className="space-y-5 animate-in fade-in-0 duration-200">
             <div className="border-b border-[#E2E8F0] pb-3 mb-4">
-              <h2 className="text-base font-bold text-[#0F294A]">Socio-Economic &amp; Eligibility Factors</h2>
-              <p className="text-xs text-[#64748B]">All income and category information is processed securely under the DPDPA 2023.</p>
+              <h2 className="text-base font-bold text-[#0F294A]">Socio-Economic &amp; Quota Parameters</h2>
+              <p className="text-xs text-[#64748B]">These parameters determine reservation quotas and means-based financial aid ceilings.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
-                label="Social Category (Caste / Quota)"
+                label="Social Category / Caste Group"
                 value={eligibility.category}
                 onChange={(e) => setEligibility({ ...eligibility, category: e.target.value })}
                 options={[
+                  { value: 'GENERAL', label: 'General / Open Merit' },
                   { value: 'OBC', label: 'OBC (Other Backward Class)' },
                   { value: 'SC', label: 'SC (Scheduled Caste)' },
                   { value: 'ST', label: 'ST (Scheduled Tribe)' },
                   { value: 'EWS', label: 'EWS (Economically Weaker Section)' },
-                  { value: 'GENERAL', label: 'General / Open' },
                 ]}
               />
+
               <Input
-                label="Annual Family Income (INR ₹)"
+                label="Total Annual Family Income (₹ INR)"
                 type="number"
+                placeholder="e.g. 235000"
                 value={eligibility.annualIncome}
                 onChange={(e) => setEligibility({ ...eligibility, annualIncome: e.target.value })}
-                helperText="Total income from all sources as mentioned in Tehsildar certificate"
+                helperText="Gross annual income from all sources as stated on your income certificate."
                 required
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Input
-                label="Parent Occupation"
+                label="Primary Parent / Guardian Occupation"
+                placeholder="e.g. Farmer, Salaried, Small Business"
                 value={eligibility.parentOccupation}
                 onChange={(e) => setEligibility({ ...eligibility, parentOccupation: e.target.value })}
               />
+
               <Select
-                label="Person with Disability (PwD)"
+                label="Person with Disability (PwD)?"
                 value={eligibility.isDisabled}
                 onChange={(e) => setEligibility({ ...eligibility, isDisabled: e.target.value })}
                 options={[
                   { value: 'NO', label: 'No' },
-                  { value: 'YES', label: 'Yes (40% or more with UDID)' },
+                  { value: 'YES', label: 'Yes (≥40% Disability)' },
                 ]}
               />
+
               <Select
-                label="Religious Minority Status"
+                label="Belong to Religious Minority Community?"
                 value={eligibility.minorityStatus}
                 onChange={(e) => setEligibility({ ...eligibility, minorityStatus: e.target.value })}
                 options={[
                   { value: 'NO', label: 'No' },
-                  { value: 'YES', label: 'Yes (Muslim, Christian, Sikh, Jain, Parsi)' },
+                  { value: 'YES', label: 'Yes (Muslim, Christian, Sikh, Buddhist, Jain, Parsi)' },
                 ]}
               />
             </div>
@@ -369,16 +466,16 @@ export default function OnboardingPage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-[#64748B] mb-3">Issued by Tahsildar / SDO for AY 2026-27 (Max 5MB PDF/JPG)</p>
-                {uploadedFiles.incomeCert ? (
+                {selectedFiles.INCOME_CERTIFICATE ? (
                   <div className="flex items-center gap-2 p-2 rounded bg-white border border-[#86EFAC] text-xs font-semibold text-[#15803D]">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{uploadedFiles.incomeCert}</span>
+                    <span className="truncate">{selectedFiles.INCOME_CERTIFICATE.name}</span>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-2.5 rounded bg-white border border-dashed border-[#CBD5E1] text-xs font-semibold text-[#0F294A] hover:bg-[#F1F5F9] cursor-pointer">
                     <UploadCloud className="w-4 h-4" />
-                    <span>Upload Certificate</span>
-                    <input type="file" className="hidden" onChange={(e) => handleFileUpload('incomeCert', e)} />
+                    <span>Select Certificate</span>
+                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => handleFileChange('INCOME_CERTIFICATE', e)} />
                   </label>
                 )}
               </div>
@@ -392,16 +489,16 @@ export default function OnboardingPage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-[#64748B] mb-3">OBC / SC / ST Certificate from competent authority</p>
-                {uploadedFiles.casteCert ? (
+                {selectedFiles.CASTE_CERTIFICATE ? (
                   <div className="flex items-center gap-2 p-2 rounded bg-white border border-[#86EFAC] text-xs font-semibold text-[#15803D]">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{uploadedFiles.casteCert}</span>
+                    <span className="truncate">{selectedFiles.CASTE_CERTIFICATE.name}</span>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-2.5 rounded bg-white border border-dashed border-[#CBD5E1] text-xs font-semibold text-[#0F294A] hover:bg-[#F1F5F9] cursor-pointer">
                     <UploadCloud className="w-4 h-4" />
-                    <span>Upload Certificate</span>
-                    <input type="file" className="hidden" onChange={(e) => handleFileUpload('casteCert', e)} />
+                    <span>Select Certificate</span>
+                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => handleFileChange('CASTE_CERTIFICATE', e)} />
                   </label>
                 )}
               </div>
@@ -415,21 +512,21 @@ export default function OnboardingPage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-[#64748B] mb-3">Proof of permanent state residency</p>
-                {uploadedFiles.domicileCert ? (
+                {selectedFiles.DOMICILE_CERTIFICATE ? (
                   <div className="flex items-center gap-2 p-2 rounded bg-white border border-[#86EFAC] text-xs font-semibold text-[#15803D]">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{uploadedFiles.domicileCert}</span>
+                    <span className="truncate">{selectedFiles.DOMICILE_CERTIFICATE.name}</span>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-2.5 rounded bg-white border border-dashed border-[#CBD5E1] text-xs font-semibold text-[#0F294A] hover:bg-[#F1F5F9] cursor-pointer">
                     <UploadCloud className="w-4 h-4" />
-                    <span>Upload Domicile Proof</span>
-                    <input type="file" className="hidden" onChange={(e) => handleFileUpload('domicileCert', e)} />
+                    <span>Select Domicile Proof</span>
+                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => handleFileChange('DOMICILE_CERTIFICATE', e)} />
                   </label>
                 )}
               </div>
 
-              {/* 12th Marksheet */}
+              {/* Marksheet */}
               <div className="border border-[#E2E8F0] rounded-lg p-4 bg-[#F8FAFC]">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-[#0F294A]">Academic Marksheet</span>
@@ -438,16 +535,16 @@ export default function OnboardingPage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-[#64748B] mb-3">12th Board or latest semester grade card</p>
-                {uploadedFiles.marksheet ? (
+                {selectedFiles.MARKSHEET_12TH ? (
                   <div className="flex items-center gap-2 p-2 rounded bg-white border border-[#86EFAC] text-xs font-semibold text-[#15803D]">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{uploadedFiles.marksheet}</span>
+                    <span className="truncate">{selectedFiles.MARKSHEET_12TH.name}</span>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-2.5 rounded bg-white border border-dashed border-[#CBD5E1] text-xs font-semibold text-[#0F294A] hover:bg-[#F1F5F9] cursor-pointer">
                     <UploadCloud className="w-4 h-4" />
-                    <span>Upload Marksheet</span>
-                    <input type="file" className="hidden" onChange={(e) => handleFileUpload('marksheet', e)} />
+                    <span>Select Marksheet</span>
+                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => handleFileChange('MARKSHEET_12TH', e)} />
                   </label>
                 )}
               </div>
@@ -467,11 +564,19 @@ export default function OnboardingPage() {
           )}
 
           <Button type="button" onClick={handleNext} variant="primary" size="md" isLoading={isLoading}>
-            <span>{currentStep === 4 ? 'Finish & View Matches' : 'Save & Continue'}</span>
+            <span>{currentStep === 4 ? 'Finish & Save Profile' : 'Save & Continue'}</span>
             <ArrowRight className="w-4 h-4" />
           </Button>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <ProtectedRoute>
+      <OnboardingContent />
+    </ProtectedRoute>
   );
 }

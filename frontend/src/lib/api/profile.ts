@@ -1,22 +1,37 @@
 import { StudentProfile } from '@/types/profile';
-import { MOCK_STUDENT_PROFILE } from '@/lib/mock/student-profile';
+import { apiClient } from './client';
 
 export const profileApi = {
   async getProfile(): Promise<StudentProfile> {
-    // Simulates TRD GET /api/profile
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    return { ...MOCK_STUDENT_PROFILE };
+    return await apiClient<StudentProfile>('/profile');
   },
 
   async updateProfile(updates: Partial<StudentProfile>): Promise<StudentProfile> {
-    // Simulates TRD PUT /api/profile
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    return { ...MOCK_STUDENT_PROFILE, ...updates };
+    // If updates contain education, send academic update
+    if (updates.education) {
+      await apiClient('/profile/academic', {
+        method: 'PUT',
+        body: JSON.stringify({
+          currentEducationLevel: updates.education.currentLevel,
+          courseName: updates.education.courseName,
+          specialization: updates.education.specialization,
+          institutionName: updates.education.institutionName,
+          percentageOrCgpa: updates.education.percentageOrCgpa,
+          yearOfStudy: updates.education.currentYearOrSemester,
+        }),
+      });
+    }
+
+    // Update personal/category/income details
+    return await apiClient<StudentProfile>('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
   },
 
   async recalculateMatches(): Promise<{ count: number; highlyEligible: number }> {
-    // Simulates TRD POST /api/profile/recalculate-matches
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    return { count: 24, highlyEligible: 8 };
-  }
+    return await apiClient<{ count: number; highlyEligible: number }>('/profile/recalculate-matches', {
+      method: 'POST',
+    });
+  },
 };

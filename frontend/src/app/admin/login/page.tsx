@@ -9,9 +9,9 @@ import { Shield } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('nodal.officer@scholarsathi.gov.in');
-  const [password, setPassword] = useState('AdminPass2026!');
-  const [totp, setTotp] = useState('482910');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [totp, setTotp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {

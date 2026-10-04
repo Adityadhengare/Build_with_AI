@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Button } from '@/components/ui/button';
 import { 
   Bell, 
@@ -14,7 +15,7 @@ import {
 import { notificationsApi } from '@/lib/api/notifications';
 import { NotificationItem } from '@/types/application';
 
-export default function NotificationsPage() {
+function NotificationsContent() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -127,5 +128,13 @@ export default function NotificationsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function NotificationsPage() {
+  return (
+    <ProtectedRoute>
+      <NotificationsContent />
+    </ProtectedRoute>
   );
 }

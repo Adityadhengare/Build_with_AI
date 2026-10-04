@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ScholarshipCard } from '@/components/scholarships/scholarship-card';
 import { Bookmark } from 'lucide-react';
 import { scholarshipApi } from '@/lib/api/scholarships';
 import { Scholarship } from '@/types/scholarship';
 
-export default function SavedScholarshipsPage() {
+function SavedScholarshipsContent() {
   const router = useRouter();
   const [savedList, setSavedList] = useState<Scholarship[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,5 +69,13 @@ export default function SavedScholarshipsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SavedScholarshipsPage() {
+  return (
+    <ProtectedRoute>
+      <SavedScholarshipsContent />
+    </ProtectedRoute>
   );
 }

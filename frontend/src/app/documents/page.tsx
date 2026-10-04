@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { 
@@ -17,7 +18,7 @@ import { documentsApi } from '@/lib/api/documents';
 import { StudentDocument, DocumentType } from '@/types/document';
 import { formatDate, formatINR } from '@/lib/utils';
 
-export default function DocumentsPage() {
+function DocumentsContent() {
   const [documents, setDocuments] = useState<StudentDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -373,5 +374,13 @@ export default function DocumentsPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <ProtectedRoute>
+      <DocumentsContent />
+    </ProtectedRoute>
   );
 }

@@ -1,69 +1,38 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminNav } from '@/components/layout/admin-nav';
-import { Button } from '@/components/ui/button';
-import { Search, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Search, CheckCircle2, AlertTriangle, Users } from 'lucide-react';
+import { adminApi } from '@/lib/api/admin';
+import { StudentProfile } from '@/types/profile';
+import { formatINR } from '@/lib/utils';
 
 export default function AdminStudentsPage() {
   const [query, setQuery] = useState('');
+  const [students, setStudents] = useState<StudentProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const mockStudents = [
-    {
-      id: 'usr-1',
-      name: 'Aditya Patil',
-      email: 'aditya.patil@engg.edu.in',
-      course: 'B.Tech Computer Science (3rd Yr)',
-      college: 'COEP Pune',
-      state: 'Maharashtra',
-      category: 'OBC',
-      income: '₹2,35,000',
-      status: 'VERIFIED',
-      completeness: '88%',
-    },
-    {
-      id: 'usr-2',
-      name: 'Priya Sharma',
-      email: 'priya.sharma@du.ac.in',
-      course: 'B.Sc Physics (2nd Yr)',
-      college: 'Miranda House, Delhi',
-      state: 'Uttar Pradesh',
-      category: 'EWS',
-      income: '₹1,80,000',
-      status: 'VERIFIED',
-      completeness: '92%',
-    },
-    {
-      id: 'usr-3',
-      name: 'Rahul K. Naik',
-      email: 'rahul.naik@rvce.edu.in',
-      course: 'B.E Electronics (1st Yr)',
-      college: 'RVCE Bangalore',
-      state: 'Karnataka',
-      category: 'SC',
-      income: '₹1,20,000',
-      status: 'NEEDS_REVIEW',
-      completeness: '75%',
-    },
-    {
-      id: 'usr-4',
-      name: 'Sneha Mondal',
-      email: 'sneha.m@ju.edu.in',
-      course: 'M.Sc Chemistry (1st Yr)',
-      college: 'Jadavpur University',
-      state: 'West Bengal',
-      category: 'GENERAL',
-      income: '₹4,50,000',
-      status: 'VERIFIED',
-      completeness: '82%',
-    },
-  ];
+  useEffect(() => {
+    async function loadStudents() {
+      setIsLoading(true);
+      try {
+        const data = await adminApi.getStudents();
+        setStudents(data || []);
+      } catch (err) {
+        console.error('Failed to load students:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadStudents();
+  }, []);
 
-  const filtered = mockStudents.filter(
+  const filtered = students.filter(
     (s) =>
-      s.name.toLowerCase().includes(query.toLowerCase()) ||
-      s.college.toLowerCase().includes(query.toLowerCase()) ||
-      s.category.toLowerCase().includes(query.toLowerCase())
+      s.fullName?.toLowerCase().includes(query.toLowerCase()) ||
+      s.email?.toLowerCase().includes(query.toLowerCase()) ||
+      s.education?.institutionName?.toLowerCase().includes(query.toLowerCase()) ||
+      s.category?.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -84,61 +53,81 @@ export default function AdminStudentsPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search students by name, college, or category..."
+            placeholder="Search students by name, college, email, or category..."
             className="h-10 w-full pl-10 pr-4 rounded-lg border border-[#CBD5E1] bg-white text-xs md:text-sm text-[#0F294A] focus:outline-none focus:border-[#0F294A]"
           />
         </div>
 
-        <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[#F8FAFC] text-[#334155] border-b border-[#E2E8F0] uppercase font-bold tracking-wider">
-                  <th className="py-3 px-4">Student Name &amp; Email</th>
-                  <th className="py-3 px-4">Institution &amp; Degree</th>
-                  <th className="py-3 px-4">Domicile State</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Family Income</th>
-                  <th className="py-3 px-4">Verification</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
-                {filtered.map((s) => (
-                  <tr key={s.id} className="hover:bg-[#F8F9FF] transition-colors">
-                    <td className="py-3 px-4">
-                      <span className="font-bold text-[#0F294A] block">{s.name}</span>
-                      <span className="text-[11px] text-[#64748B]">{s.email}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="font-medium text-[#0F294A] block">{s.course}</span>
-                      <span className="text-[11px] text-[#64748B]">{s.college}</span>
-                    </td>
-                    <td className="py-3 px-4 text-[#475569]">{s.state}</td>
-                    <td className="py-3 px-4 font-bold text-[#0F294A]">{s.category}</td>
-                    <td className="py-3 px-4 font-semibold text-[#15803D]">{s.income}</td>
-                    <td className="py-3 px-4">
-                      {s.status === 'VERIFIED' ? (
-                        <span className="px-2 py-0.5 rounded bg-[#DCFCE7] text-[#15803D] font-bold text-[10px] flex items-center gap-1 w-fit">
-                          <CheckCircle2 className="w-3 h-3" /> VERIFIED
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] font-bold text-[10px] flex items-center gap-1 w-fit">
-                          <AlertTriangle className="w-3 h-3" /> PENDING
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Button variant="outline" size="sm" className="h-7 text-xs">
-                        Audit
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-white border border-[#E2E8F0] rounded-xl animate-pulse" />
+            ))}
           </div>
-        </div>
+        ) : students.length === 0 ? (
+          <div className="bg-white border border-dashed border-[#CBD5E1] p-12 rounded-xl text-center">
+            <Users className="w-10 h-10 text-[#94A3B8] mx-auto mb-2" />
+            <h3 className="text-base font-bold text-[#0F294A]">No student profiles registered yet</h3>
+            <p className="text-xs text-[#64748B] mt-1">
+              When new students register and fill onboarding details, their records will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-[#F8FAFC] text-[#334155] border-b border-[#E2E8F0] uppercase font-bold tracking-wider">
+                    <th className="py-3 px-4">Student Name &amp; Email</th>
+                    <th className="py-3 px-4">Institution &amp; Degree</th>
+                    <th className="py-3 px-4">Domicile State</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Annual Income</th>
+                    <th className="py-3 px-4 text-right">Profile Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2E8F0]">
+                  {filtered.map((s) => (
+                    <tr key={s.id || s.email} className="hover:bg-[#F8F9FF] transition-colors">
+                      <td className="py-3 px-4">
+                        <span className="font-bold text-[#0F294A] block">{s.fullName}</span>
+                        <span className="text-[11px] text-[#64748B]">{s.email}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="font-semibold text-[#0F294A] block">
+                          {s.education?.courseName || 'Course Not Specified'}
+                        </span>
+                        <span className="text-[11px] text-[#64748B]">
+                          {s.education?.institutionName || 'Institution Not Specified'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-[#475569]">{s.domicileState || 'Not Specified'}</td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-[#EFF4FF] text-[#1E3A8A] border border-[#BFDBFE]">
+                          {s.category}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-bold text-[#0F294A]">
+                        {formatINR(s.familyAnnualIncome || 0)}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {(s.profileCompleteness && s.profileCompleteness >= 70) ? (
+                          <span className="text-xs font-bold text-[#15803D] flex items-center justify-end gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Completed
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold text-[#B45309] flex items-center justify-end gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Incomplete
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
